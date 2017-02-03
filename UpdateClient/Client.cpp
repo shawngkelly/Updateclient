@@ -45,6 +45,10 @@ int main()
 	char		recvMessage[STRLEN];
 	bool		done = false;
 
+
+	//Client checks the local version number
+	localVersion = getLocalVersion();
+
 	//Connection functions 
 	// Loads Windows DLL (Winsock version 2.2) used in network programming
 	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != NO_ERROR)
@@ -87,27 +91,48 @@ int main()
 	// 2) update the data file if it is out of data
 	
 	// Main purpose of the program starts here: read two numbers from the data file and calculate the sum
-	localVersion = getLocalVersion();
+	
 	cout << "\nSum Calculator Version " << localVersion << "\n\n";
 
 	readData(num1, num2);	
 	sum = num1 + num2;
 	cout << "The sum of " << num1 << " and " << num2 << " is " << sum << endl;
 	
-	//Send Verison number to check with server
-	cout << " Checking with server for update of version " << localVersion;
-	
-	int vSend = send(mySocket, (char*)&localVersion, strlen((char*)&localVersion), 0);
+	//Send request to server
+
+	cout << " Checking with server for version number " << localVersion;
+	send(mySocket, (char*)&QUERY, strlen((char*)&QUERY), 0);
+
 
 	if (!done)
 	{
 		// Wait to receive a reply message back from the remote computer
+
 		cout << "\n\t--WAIT--\n\n";
 		int iRecv = recv(mySocket, recvMessage, STRLEN, 0);
 		if (iRecv > 0)
 		{
-			recvMessage[iRecv] = '\0';
-			cout  << recvMessage << "\n";
+			//Compares versions. If different will request new version. If same will close. 
+
+			if (localVersion != (int)recvMessage[0])
+			{
+				recvMessage[iRecv] = '\0';
+				cout << "Server version " << (int)recvMessage[0] << " is incompatible with Local version " << localVersion << "\n\n";
+
+			}
+			else
+			{   
+				cout << "Version is current\n\n";
+				cout << "\nSum Calculator Version " << localVersion << "\n\n";
+
+				readData(num1, num2);
+				sum = num1 + num2;
+				cout << "The sum of " << num1 << " and " << num2 << " is " << sum << endl;
+				cleanup(mySocket);
+
+				return 0;
+			}
+
 		}
 		else if (iRecv == 0)
 		{
@@ -124,6 +149,8 @@ int main()
 
 		// Communication ends if server sent an "end" message
 		if (strcmp(recvMessage, "end") == 0) done = true;
+
+
 	}
 
 
