@@ -119,6 +119,36 @@ int main()
 				recvMessage[iRecv] = '\0';
 				cout << "Server version " << (int)recvMessage[0] << " is incompatible with Local version " << localVersion << "\n\n";
 
+				// Create a new socket to reconnect
+				mySocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+
+				if (mySocket == INVALID_SOCKET)
+				{
+					cerr << "ERROR: Cannot create socket\n";
+					WSACleanup();
+					return 1;
+				}
+
+				cout << "\nAttempting to reconnect...\n";
+
+				//Attempt to reconnect to reequest new version
+				if (connect(mySocket, (SOCKADDR*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR)
+				{
+					cerr << "ERROR: Failed to connect\n";
+					cleanup(mySocket);
+					return 1;
+				}
+
+				cout << "Reconnected. Send request for update\n\n";
+
+				//Send a request for updated file. int 2
+				send(mySocket, (char*)&UPDATE, strlen((char*)&UPDATE), 0);
+
+				//Waiting for file
+				cout << "---Waiting for file";
+
+
+
 			}
 			else
 			{   
@@ -152,9 +182,6 @@ int main()
 
 
 	}
-
-
-	
 	cleanup(mySocket);
 
 	return 0;
