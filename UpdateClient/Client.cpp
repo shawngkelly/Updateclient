@@ -25,7 +25,7 @@ int getLocalVersion();
 // Reads the two data values from the data file.
 // When the function ends, num1 and num2 will be holding the
 // two values that were read from the file.
-void readData(int& num1, int& num2);
+void readData(int& num1, int& num2, int& num3);
 
 int main()
 {
@@ -33,6 +33,7 @@ int main()
 	int			sum;
 	int			num1 = 0;
 	int			num2 = 0;	
+	int			num3 = 0;
 	int			localVersion = 0;
 
 	//Socket vars
@@ -94,9 +95,9 @@ int main()
 	
 	cout << "\nSum Calculator Version " << localVersion << "\n\n";
 
-	readData(num1, num2);	
-	sum = num1 + num2;
-	cout << "The sum of " << num1 << " and " << num2 << " is " << sum << endl;
+	readData(num1, num2, num3);	
+	sum = num2 + num3;
+	cout << "The sum of " << num2 << " and " << num3 << " is " << sum << endl;
 	
 	//Send request to server
 
@@ -155,9 +156,9 @@ int main()
 				cout << "Version is current\n\n";
 				cout << "\nSum Calculator Version " << localVersion << "\n\n";
 
-				readData(num1, num2);
-				sum = num1 + num2;
-				cout << "The sum of " << num1 << " and " << num2 << " is " << sum << endl;
+				readData(num1, num2, num3);
+				sum = num2 + num3;
+				cout << "The sum of " << num2 << " and " << num3 << " is " << sum << endl;
 				cleanup(mySocket);
 
 				return 0;
@@ -198,17 +199,17 @@ int getLocalVersion()
 	return version;
 }
 
-void readData(int& num1, int& num2)
+void readData(int& num1, int& num2, int& num3)
 {
 	ifstream dataFile;
 	openInputFile(dataFile, FILENAME);
 
 	// Read the version number and discard it
-	int tmp = num1 = readInt(dataFile);
+	  num1 = readInt(dataFile);
 
 	// Read the two data values
-	num1 = readInt(dataFile);
 	num2 = readInt(dataFile);
+	num3 = readInt(dataFile);
 
 	dataFile.close();
 }
