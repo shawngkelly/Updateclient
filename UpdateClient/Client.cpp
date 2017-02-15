@@ -43,7 +43,7 @@ int main()
 	char		ipAddress[20];
 	int			port;
 	char		sendMessage[STRLEN];
-	char		recvMessage[STRLEN];
+	int		    recvMessage;
 	bool		done = false;
 
 
@@ -101,8 +101,8 @@ int main()
 	
 	//Send request to server
 
-	cout << " Checking with server for version number " << localVersion;
-	send(mySocket, (char*)&QUERY, strlen((char*)&QUERY), 0);
+	cout << " Checking with server for current version number " << localVersion;
+	send(mySocket, (char*)&QUERY, sizeof((char*)&QUERY), 0);
 
 
 	if (!done)
@@ -110,17 +110,17 @@ int main()
 		// Wait to receive a reply message back from the remote computer
 
 		cout << "\n\t--WAIT--\n\n";
-		int iRecv = recv(mySocket, recvMessage, STRLEN, 0);
+		int iRecv = recv(mySocket, (char*)&recvMessage, sizeof((char*)&recvMessage), 0);
 		if (iRecv > 0)
 		{
 			//Compares versions. If different will request new version. If same will close. 
 
-			if (localVersion != (int)recvMessage[0])
+			if (localVersion != recvMessage)
 			{
-				recvMessage[iRecv] = '\0';
-				cout << "Server version " << (int)recvMessage[0] << " is incompatible with Local version " << localVersion << "\n\n";
+				
+				cout << "Server version " << recvMessage << " is incompatible with Local version " << localVersion << "\n\n";
 
-				// Create a new socket to reconnect
+				 // Create a new socket to reconnect
 				mySocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
 				if (mySocket == INVALID_SOCKET)
@@ -130,7 +130,7 @@ int main()
 					return 1;
 				}
 
-				cout << "\nAttempting to reconnect...\n";
+				cout << "\nAttempting to reconnect...\n";  
 
 				//Attempt to reconnect to reequest new version
 				if (connect(mySocket, (SOCKADDR*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR)
@@ -140,18 +140,32 @@ int main()
 					return 1;
 				}
 
-				cout << "Reconnected. Send request for update\n\n";
+				cout << "Reconnected. Send request for update\n\n";  
 
 				//Send a request for updated file. int 2
-				send(mySocket, (char*)&UPDATE, strlen((char*)&UPDATE), 0);
+				send(mySocket, (char*)&UPDATE, sizeof((char*)&UPDATE), 0);
 
 				//Waiting for file
 				cout << "---Waiting for file";
-
+				int recvNum1 = recv(mySocket, (char*)&num1, sizeof((char*)&num1), 0);
+				int recvNum2 = recv(mySocket, (char*)&num2, sizeof((char*)&num2), 0);
+				int recvNum3 = recv(mySocket, (char*)&num3, sizeof((char*)&num3), 0);
+				if ((recvNum1 || recvNum2 || recvNum3) == SOCKET_ERROR)
+				{
+					cerr << "ERROR : FAILED TO RCV UPDATE\n";
+					cleanup(mySocket);
+				}
+				cout << "Update received from server. \n";
+				ofstream dataFile;
+				openOutputFile(dataFile, FILENAME);
+				writeInt(dataFile, num1);
+				writeInt(dataFile, num2); 
+				writeInt(dataFile, num3);
+				dataFile.close();
 
 
 			}
-			else
+			else if (localVersion == recvMessage)
 			{   
 				cout << "Version is current\n\n";
 				cout << "\nSum Calculator Version " << localVersion << "\n\n";
@@ -178,8 +192,7 @@ int main()
 			return 1;
 		}
 
-		// Communication ends if server sent an "end" message
-		if (strcmp(recvMessage, "end") == 0) done = true;
+		
 
 
 	}
