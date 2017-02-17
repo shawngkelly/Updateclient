@@ -14,18 +14,21 @@ const int  UPDATE = 2;
 const int STRLEN = 256;
 
 // Closes the socket and performs the WSACleanup
+
 void cleanup(SOCKET socket);
 
 // Returns the version number from the data file
 int getLocalVersion();
 
 
+// Reads the 3 data values from the data file.
+// When the function ends, num1, num2 and num3 will be holding the
+// 3 values that were read from the file.
 
-
-// Reads the two data values from the data file.
-// When the function ends, num1 and num2 will be holding the
-// two values that were read from the file.
 void readData(int& num1, int& num2, int& num3);
+
+//Client will start. It will check it's own version. Client will attempt to make connection to server.
+//Once the client checks it's version against server, it will either request an update or close the connection.
 
 int main()
 {
@@ -34,24 +37,23 @@ int main()
 	int			num1 = 0;
 	int			num2 = 0;	
 	int			num3 = 0;
-	int			localVersion = 0;
+	int			localVersion;
 
 	//Socket vars
 	WSADATA		wsaData;
 	SOCKET		mySocket;
 	SOCKADDR_IN	serverAddr;
-	char		ipAddress[20];
-	int			port;
-	char		sendMessage[STRLEN];
 	int		    recvMessage;
 	bool		done = false;
 
 
 	//Client checks the local version number
+
 	localVersion = getLocalVersion();
 
 	//Connection functions 
 	// Loads Windows DLL (Winsock version 2.2) used in network programming
+
 	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != NO_ERROR)
 	{
 		cerr << "ERROR: Problem with WSAStartup\n";
@@ -59,6 +61,7 @@ int main()
 	}
 
 	// Create a new socket for communication
+
 	mySocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
 	if (mySocket == INVALID_SOCKET)
@@ -73,11 +76,13 @@ int main()
 	// Setup a SOCKADDR_IN structure which will be used to hold address
 	// and port information for the server. Notice that the port must be converted
 	// from host byte order to network byte order.
+
 	serverAddr.sin_family = AF_INET;
 	serverAddr.sin_port = htons(PORT);
 	inet_pton(AF_INET, IPADDR, &serverAddr.sin_addr);
 
 	// Try to connect
+
 	if (connect(mySocket, (SOCKADDR*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR)
 	{
 		cerr << "ERROR: Failed to connect\n";
@@ -87,42 +92,38 @@ int main()
 
 	cout << "Connected...\n\n";
 
-	// Add code here to
-	// 1) make sure that we are using the current version of the data file
-	// 2) update the data file if it is out of data
-	
-	// Main purpose of the program starts here: read two numbers from the data file and calculate the sum
-	
-	cout << "\nSum Calculator Version " << localVersion << "\n\n";
+	//Send request to server for version number. 
 
-	readData(num1, num2, num3);	
-	sum = num2 + num3;
-	cout << "The sum of " << num2 << " and " << num3 << " is " << sum << endl;
-	
-	//Send request to server
-
-	cout << " Checking with server for current version number " << localVersion;
-	send(mySocket, (char*)&QUERY, sizeof((char*)&QUERY), 0);
-
+	cout << "Sending request to server for version.\n\n " << localVersion << " is the client verison.\n";
+	int isend = send(mySocket, (char*)&QUERY, sizeof((char*)&QUERY), 0);
+	if (isend == SOCKET_ERROR)
+	{
+		cerr << "ERROR : FAILED TO SEND REQUEST\n";
+		cleanup(mySocket);
+		return 1;
+	}
 
 	if (!done)
 	{
 		// Wait to receive a reply message back from the remote computer
 
-		cout << "\n\t--WAIT--\n\n";
+		cout << "----WAITING FOR REPLY ----\n\n";
 		int iRecv = recv(mySocket, (char*)&recvMessage, sizeof((char*)&recvMessage), 0);
 		if (iRecv > 0)
 		{
 			//Compares versions. If different will request new version. If same will close. 
 
-			if (localVersion != recvMessage)
+			if(localVersion == recvMessage)
+			{
+				cout << "Client version " << localVersion << " is current with server version\n\n";
+			}
+			if(localVersion != recvMessage)
 			{
 				
-				cout << "Server version " << recvMessage << " is incompatible with Local version " << localVersion << "\n\n";
+				cout << "Server version " << recvMessage << " is incompatible with client version " << localVersion << "\n\n";
 
 				 // Create a new socket to reconnect
 				mySocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-
 				if (mySocket == INVALID_SOCKET)
 				{
 					cerr << "ERROR: Cannot create socket\n";
@@ -140,21 +141,32 @@ int main()
 					return 1;
 				}
 
-				cout << "Reconnected. Send request for update\n\n";  
+				cout << "Reconnected. Sending request for update\n\n";  
 
 				//Send a request for updated file. int 2
-				send(mySocket, (char*)&UPDATE, sizeof((char*)&UPDATE), 0);
+
+				if	(send(mySocket, (char*)&UPDATE, sizeof((char*)&UPDATE), 0) == SOCKET_ERROR)
+				{
+					cerr << "ERROR : FAILED TO SEND REQUEST\n";
+					cleanup(mySocket);
+					return 1;
+				}
 
 				//Waiting for file
-				cout << "---Waiting for file";
+
+				cout << "----Waiting for file-----\n\n";
 				int recvNum1 = recv(mySocket, (char*)&num1, sizeof((char*)&num1), 0);
 				int recvNum2 = recv(mySocket, (char*)&num2, sizeof((char*)&num2), 0);
 				int recvNum3 = recv(mySocket, (char*)&num3, sizeof((char*)&num3), 0);
-				if ((recvNum1 || recvNum2 || recvNum3) == SOCKET_ERROR)
+				if (recvNum1 == SOCKET_ERROR || recvNum2 == SOCKET_ERROR || recvNum3 ==SOCKET_ERROR)
 				{
 					cerr << "ERROR : FAILED TO RCV UPDATE\n";
 					cleanup(mySocket);
+					return 1;
 				}
+
+				//Open file and write date to file. 
+
 				cout << "Update received from server. \n";
 				ofstream dataFile;
 				openOutputFile(dataFile, FILENAME);
@@ -162,29 +174,27 @@ int main()
 				writeInt(dataFile, num2); 
 				writeInt(dataFile, num3);
 				dataFile.close();
-
-
 			}
-			else if (localVersion == recvMessage)
-			{   
-				cout << "Version is current\n\n";
-				cout << "\nSum Calculator Version " << localVersion << "\n\n";
+			  
 
-				readData(num1, num2, num3);
-				sum = num2 + num3;
-				cout << "The sum of " << num2 << " and " << num3 << " is " << sum << endl;
-				cleanup(mySocket);
+			cout << "Version is current\n\n";
+			cout << "\nSum Calculator Version " << getLocalVersion() << "\n\n";
 
-				return 0;
-			}
+			readData(num1, num2, num3);
+			sum = num2 + num3;
+			cout << "The sum of " << num2 << " and " << num3 << " is " << sum << endl;
 
+			cleanup(mySocket);
+			return 0;			
 		}
+
 		else if (iRecv == 0)
 		{
 			cout << "Connection closed\n";
 			cleanup(mySocket);
 			return 0;
 		}
+
 		else
 		{
 			cerr << "ERROR: Failed to receive message\n";
@@ -192,12 +202,10 @@ int main()
 			return 1;
 		}
 
-		
-
-
 	}
-	cleanup(mySocket);
 
+
+	cleanup(mySocket);
 	return 0;
 }
 
